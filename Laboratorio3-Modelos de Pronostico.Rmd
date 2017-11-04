@@ -1,0 +1,299 @@
+---
+title: "Modelos de Pronostico - Laboratorio 3"
+author: "André Omar Chávez Panduro"
+date: "27 de septiembre de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## SIMULACIÓN DE MODELOS AR(p) , MA(q) Y ARMA(p,q)
+
+Un ruido blanco es una serie tal que su media es cero, la varianza es constante y es incorrelacionada. Lo que haremos es simular valores de una serie de tiempo proveniente de una distribución normal con media cero y varianza uno. Se calculé la media con el comando mean y se analizo la incorrelación por medio del correlograma generado de la función afc . Se observa en la gráfica que sus valores para el t>0 son casi cero o que están debajo de las bandas azules de la gráfica (bandas de Bartlett) .
+
+Hay dos cosas importantes en la definición de ruido blanco, pedir que la varianza sea constante con respecto al tiempo es algo bastante relevante. Esa propiedad se llama homocedasticidad. Cuando se analiza la regresión lineal se pueden hace varias pruebas estadísticas al respecto, pero con las series de tiempo basta analizar el comportamiento de la función de autocorrelación que se gráfica en los correlogramas.
+
+```{r}
+#Ejemplo Ruido Blanco
+#Generamos los datos
+ruido_blanco=rnorm(1000,0,1)
+
+#Graficamos la serie de tiempo
+plot.ts(ruido_blanco, main="Ejemplo de Ruido Blanco", xlab="Tiempo", ylab="Valores",col="6")
+
+#Graficamos su correlograma
+acf(ruido_blanco,main="Correlograma",col="2",lag=50)
+
+#Calculamos la media
+mean(ruido_blanco)
+
+#Calcular de desviación estándar
+sd(ruido_blanco)
+```
+
+
+También se puede probar que una serie es un ruido blanco por medio de prueba de hipótesis. Para esto se puede hacer uso de  dos posibles pruebas Ljung-Box o Durbin-Watson.
+
+```{r}
+#Ejemplo Ruido Blanco
+#Prueba Ljung-Box
+## H0: Los residuos se distribuyen de forma independiente
+ruido_blanco=rnorm(1000,0,1)
+Box.test(ruido_blanco)
+```
+
+La relevancia de los ruidos blancos es que son piezas fundamentales de la construcción de los modelos arma. Por eso es importante tener ubicadas sus propiedades y como simularlos.
+
+Cabe mencionar que existe una relación entre las caminatas aleatorias y los ruidos blancos.
+En resumen, se dice que la diferenciación de una caminata aleatoria es un ruido blanco. Explico más adelante a que se refiere esto.
+
+##Otros Ejemplos
+```{r}
+#Simulamos 100 números aleatorios que sean ruido blanco con media cero y varianza uno
+#rnorm(n, mean = 0, sd = 1)
+g=rnorm(100,0,1)
+par(mfrow=c(1,2))
+ts.plot(g,main="Nii(0,1)")
+acf(g, main="Autocorrelación Simple",ylim=c(-1,1),ci.col="black",ylab="")
+```
+
+##  Código en R para simular un camino aleatorio.
+
+```{r}
+##  Código en R para simular un camino aleatorio.
+w=rnorm(100)
+x=w
+for (t in 2:100) x[t] <- x[t - 1] + w[t]
+par(mfrow=c(2,2))
+ts.plot(x, main="Camino aleatorio Xt")
+acf(x, main="Autocorrelación Simple de Xt",ylim=c(-.5,.5),ci.col="black",ylab="")
+d=diff(x)
+ts.plot(d,main="Primera diferencia de Xt")
+acf(d, main="Autocorrelación Simple de d",ylim=c(-.5,.5),ci.col="black",ylab="")
+```
+
+## Procesos Estacionarios
+
+La razón de este concepto con las series de tiempo tienen que ver con le hecho de pensar la serie de tiempo Y(t) como una familia de variables aleatorias que tienen una distribución conjunta y que el valor que observamos de la seria es el valor particular de las variables.
+
+La idea es que la serie es un caso particular de valores posibles de las variables aleatorias y por lo cual se puede definir p(Y1,Y2,…,Yt) y p(Y(t+1)|Y1,Y2,…,Yt). Es decir, su probabilidad conjunta y su probabilidad condicional. Ser estacionario tiene que ver con la posibilidad de cambiar t y no afectar la distribución conjunta ni la distribución condicional.
+
+Quizás es enredoso pensar en el concepto de que la seria sea estacionaria, pero es la idea teórica que permite desarrollar las técnicas de análisis.
+
+En resumen, lo que termina significando el concepto es que deseamos que la media de la serie sea constante, que la varianza también y que la covarianza solo dependa de la distancia temporal entre los datos. Estos supuesto son parecidos a los que se mencionó en los ruidos blancos.
+
+Simplificando el concepto se puede definir una serie estacionaria en covarianza, con lo cual solo se pide que la media sea constante y que la covarianza sea  solo dependiente de la distancia temporal entre las variables.
+
+Todo lo teórico antes mencionado se reduce analizar la función de autocorrelación o el correlograma. Si la gráfica del correlograma muestra que las barras tienden a cero o va teniendo valores muy pequeños, podemos considerar que la serie que analizamos es estacionaria por lo menos en covarianza.
+
+
+## Modelos de Medias Móviles
+
+La idea de estos procesos o modelos es que dada nuestra serie Y(t) de algún experimento o fenómeno, sus valores son el resultado de sumas de un ruido blanco.
+En lugar de utilizar valores pasados de la variable de pronóstico en una regresión, un modelo de media móvil utiliza errores de pronóstico anteriores en un modelo similar a la regresión.
+
+yt = c + et + θ1et-1 + θ2et-2 + ⋯ + θqet-q,
+
+
+donde et es ruido blanco. Nos referimos a esto como un modelo de MA(q). Por supuesto, no observamos los valores de et, por lo que no es realmente regresión en el sentido usual.
+
+Observe que cada valor de yt puede considerarse como una media móvil ponderada de los últimos errores de pronóstico. Sin embargo, los modelos de media móvil no deben confundirse con el suavizado promedio móvil que discutimos en las clases pasadas.
+
+Es posible escribir cualquier modelo estacionario AR (p) como un modelo MA (∞). Por ejemplo, usando la sustitución repetida, podemos demostrar esto para un modelo AR (1):
+
+yt = φ1yt-1 + et = φ1 (φ1yt-2 + et-1) + et = φ21yt-2 + φ1et-1 + et = φ31yt-3 + φ21et-2 + φ1et-1 +et
+etc
+
+Si -1 <φ1 <1, el valor de φk1 se reducirá a medida que k sea mayor. Así que eventualmente obtenemos
+
+yt = et + φ1et-1 + φ21et-2 + φ31et-3 + ⋯,
+
+un proceso MA (∞).
+
+El resultado inverso se cumple si imponemos algunas limitaciones a los parámetros de MA. Entonces el modelo MA se llama "invertible". Es decir, que podemos escribir cualquier proceso inversible MA (q) como un proceso AR (∞).
+
+Los modelos invertibles no son simplemente para permitirnos convertir de modelos MA a modelos AR. También tienen algunas propiedades matemáticas que los hacen más fáciles de usar en la práctica.
+
+Las restricciones de invertibilidad son similares a las restricciones de estacionariedad.
+
+Para un modelo MA (1): -1 <θ1 <1
+Para un modelo MA (2): -1 <θ2 <1, θ2 + θ1> -1, θ1-θ2 <1.
+Las condiciones más complicadas se mantienen para q≥3. Una vez más, R se encargará de estas limitaciones al estimar los modelos
+
+##Consideraciones Importantes de Procesos MA(q)
+
+Su media o esperanza es cero
+La varianza del proceso en cualquier tiempo depende de los valores de los coeficientes B, C y de la varianza del ruido blanco.
+Son procesos estacionarios.
+La herramientas que siempre se usan para analizar series son la ACF y PACF, funcione de autocorrelación y función de autocorrelación parcial, respectivamente. La ACF de un MA(q) decrece rápidamente a cero y PACF decrece a cero si el procesos es invertible.
+
+Una simulación de estos procesos se puede realizar con la librería forecast.
+
+
+```{r}
+##  Código en R para simular un proceso de media móvil de orden 1 MA(1)
+#Simulación de un proceso MA(1) con theta=0.5
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+MA=arima.sim(list(order=c(0,0,1), ma=.5), n=100)
+plot(MA, ylab=" ", main=(expression(MA(1)~~~theta==+.5)))
+acf(MA, main="Autocorrelación Simple",ylim=c(-.5,.5),ci.col="black",ylab="")
+pacf(MA,main="Autocorrelación Parcial",ylim=c(-.5,.5),ci.col="black")
+```
+
+```{r}
+##Simulación de un proceso MA(1) con theta=0.1
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE)) 
+MA=arima.sim(list(order=c(0,0,1), ma=.1), n=100) 
+plot(MA, ylab=" ", main=(expression(MA(1)~~~theta==+.1))) 
+acf(MA, main="Autocorrelación Simple",ylim=c(-.2,.2),ci.col="black",ylab="") 
+pacf(MA,main="Autocorrelación Parcial",ylim=c(-.2,.2),ci.col="black")
+```
+
+
+```{r}
+#Ejemplo Medias Móviles MA(2)
+#Cargamos la librería
+library(forecast)
+n= 400
+theta = c(1,-0.4,-0.4)
+#Generamos la simulaicón
+y.ma = arima.sim(list(order=c(0,0,2), ma=theta[2:3]), n=n,sd=sqrt(2.3))
+layout(1:3)
+ts.plot(y.ma,main="ModeloA(q)", xlab="Tiempo", ylab="Valore",col="6")
+acf(y.ma,50, main="Medias Moviles")
+pacf(y.ma,50, main="Medias Moviles")
+
+```
+
+
+
+Receta: revisar el comportamiento de la función de autocorrelación. La información de la existencia de un proceso de MA se concentra en ACF.
+
+En el ejemplo tenemos un MA(2) y se muestra que las dos líneas que salen del la banda azul concuerdan con el número de parámetros del modelo y ACF converge a cero para t muy grande.
+
+##Modelos Autorregresivos
+
+
+En un modelo de regresión múltiple, se pronostica la variable de interés utilizando una combinación lineal de predictores. En un modelo de autorregresión, se pronostica la variable de interés utilizando una combinación lineal de valores pasados de la variable. El término autorregresión indica que es una regresión de la variable contra sí misma.
+
+Así, un modelo autorregresivo de orden p puede escribirse como
+
+##yt=c+ϕ1yt−1+ϕ2yt−2+⋯+ϕpyt−p+et,
+
+donde c es una constante y et es ruido blanco. Esto es como una regresión múltiple, pero con valores rezagados de yt como predictores. Nos referimos a esto como un modelo AR (p).
+
+Los modelos autorregresivos son notablemente flexibles al manejar una amplia gama de diferentes patrones de series temporales.
+
+
+##Para un AR(1) model:
+
+Cuando ϕ1=0, yt es equivalente a ruido blanco.
+Cuando ϕ1=1 and c=0, yt es equivalente a un camino aleatorio.
+Cuando ϕ1=1 and c≠0, yt es equivalente a un camino aleatorio con diferencias.
+Cuando ϕ1<0ϕ1<0, yt tiende a oscilar entre valores positivos y negativos.
+
+Normalmente restringimos los modelos autorregresivos a los datos estacionarios y, a continuación, se requieren algunas restricciones sobre los valores de los parámetros.
+
+For an AR(1) model:   −1<ϕ1<1.
+For an AR(2) model:   −1<ϕ2<1,   ϕ1+ϕ2<1,   ϕ2−ϕ1<1.
+Cuando p≥3p las restricciones son mucho más complicadas.
+
+Receta: analizar la función ACFP.
+
+La función ACF decae abruptamente indicando como las barras negras más largas la cantidad de parámetros del modelo y ACF decrece conforme t tiene a infinito. Esto caracteriza a los modelos autorregresivos.
+
+
+
+```{r}
+##  Codigo en R para simular un proceso auroregresivo de orden 1 AR(1)
+# Simulacion de un proceso AR(1) con phi=0.4
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+AR=arima.sim(list(order=c(1,0,0), ar=.8), n=100)
+plot(AR, ylab=" ", main=(expression(AR(1)~~~phi==+.4)))
+acf(AR, main="Autocorrelación Simple",ylim=c(-1,.1),ci.col="black",ylab="")
+pacf(AR,main="Autocorrelación Parcial",ylim=c(-.5,.5),ci.col="black")
+```
+
+```{r}
+## Para simular una serie de acuerdo con un modelo AR prefijado con phi=0.9:
+AR=arima.sim(list(order=c(1,0,0), ar=.9), n=100) 
+plot(AR, ylab=" ", main=(expression(AR(1)~~~phi==+.9))) 
+acf(AR, main="Autocorrelación Simple",ylim=c(-.3,.3),ci.col="black",ylab="") 
+pacf(AR,main="Autocorrelación Parcial",ylim=c(-.3,.3),ci.col="black")
+```
+
+```{r}
+## Para simular una serie de acuerdo con un modelo AR prefijado con phi=-0.9:
+AR=arima.sim(list(order=c(1,0,0), ar=-.9), n=100) 
+plot(AR, ylab=" ", main=(expression(AR(1)~~~phi==-.9))) 
+acf(AR, main="Autocorrelación Simple",ylim=c(-.5,.5),ci.col="black",ylab="") 
+pacf(AR,main="Autocorrelación Parcial",ylim=c(-.5,.5),ci.col="black")
+```
+
+```{r}
+## Para simular una serie AR(1) con una diferencia:
+ts.sim <- arima.sim(list(order = c(1,0,0), ar = 0.7), n = 200)
+ts.plot(ts.sim)
+acf( ts.sim )
+pacf( ts.sim ,main="Autocorrelación Parcial",ylim=c(-.5,.5),ci.col="black")
+```
+
+
+```{r}
+#Ejemplo 1 de modelo Autorregresivo
+library(forecast)
+n= 400
+theta = c(1,1.5,-0.9)
+ts.sim <- arima.sim(list(order = c(2,0,0), ar = theta[2:3]), n = n)
+layout(1:3)
+ts.plot(ts.sim,main=expression("ModeloR(q) "*phi*"1=1.5 y "*phi*"2=-0.9"), xlab="Tiempo", ylab="Valore",col="6")
+acf(ts.sim,50, main="Autoregresivo")
+pacf(ts.sim,50, main="Autoregresivo")
+
+#Ejemplo 2 de Autoregresivo
+ts.sim <- arima.sim(list(order = c(1,0,0), ar = -.9), n = n)
+layout(1:3)
+ts.plot(ts.sim,main=expression("ModeloR(q) con "*phi*"=-0.9"), xlab="Tiempo", ylab="Valore",col="6")
+acf(ts.sim,50, main="Autoregresivo")
+pacf(ts.sim,50, main="Autoregresivo")
+```
+
+
+Las gráficas muestran lo que se indicó, la función PACF indica el número de parámetros y ACF decae a cero.
+
+
+##Modelos ARMA
+
+Autorregresivos-medias móviles, ARMA(p,q). Estos modelos como el nombre indican consideran que la serie depende de la información pasada ( autorregresivo) y lo restante se modela por media de un proceso de medias móviles.
+
+La idea es algo así:
+
+Y(t)=AR(q)+Error(t)
+
+donde Error(t)=MA(p)
+
+Para asegurar que son estacionarios los procesos ARMA se requieren ciertas propiedades que son heredadas de su parte autorregresiva y de su parte de medias móviles. 
+
+El problema es elegir el modelo  ARMA(p,q) adecuado, no hay un método fijo, lo recomendable es hacer varios modelos candidatos. Para elegir uno de ellos es bueno considerar la parsimonia del modelo y apoyarse en los estadísticos AIC y BIC.
+
+
+ Ejemplos de modelos ARMA
+ 
+```{r}
+## Para simular una serie de acuerdo con un modelo ARMA prefijado:
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE)) 
+x <- arima.sim(n=10000,model=list(ar=c(0.3,0.6),ma=c(2,3)),sd=1)
+plot(x)
+acf(x)
+pacf(x,main="Autocorrelación Parcial",ylim=c(-.5,.5),ci.col="black")
+```
+
+
+
+
+
+
+
+
